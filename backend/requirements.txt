@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+networkx
+pulp
+geopy
+numpy
+scipy
+requests
