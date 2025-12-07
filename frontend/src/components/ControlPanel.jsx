@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { 
-    Play, Pause, RefreshCw, Settings, Map as MapIcon, Grid, 
+    Play, Pause, RefreshCw, Settings, Map as MapIcon, Grid, Globe,
     Plus, Trash2, Eye, EyeOff, Dices, Clock, BarChart, 
-    Download, Upload, Bug, Moon, Sun, Minus, Pin
+    Download, Upload, Bug, Moon, Sun, Minus
 } from 'lucide-react';
 
 const ControlPanel = ({ 
@@ -155,29 +155,35 @@ const ControlPanel = ({
 
   return (
     <div className={`w-80 h-full flex flex-col border-r transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-gray-100 border-gray-800' : 'bg-white text-gray-900 border-gray-200'}`}>
+      
+      {/* Header */}
       <div className={`p-4 border-b flex-shrink-0 flex justify-between items-start transition-colors duration-300 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
         <div>
             <h1 className={`text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
             <Settings className="w-5 h-5 text-blue-600" /> LoRa Optimizer
             </h1>
-            <div className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>v0.0.3 - Beta</div>
+            <div className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>v0.0.4 - Beta</div>
         </div>
         <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full transition-colors ${darkMode ? 'bg-gray-700 text-yellow-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
       </div>
 
+      {/* Content */}
       <div className={`flex-1 overflow-y-auto p-4 space-y-6 min-h-0 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
         <section>
           <div className="flex justify-between items-center mb-2">
              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Display</h3>
           </div>
+          
+          {/* Map Modes */}
           <div className={`flex gap-2 p-1 rounded-lg mb-3 ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
                 <button onClick={() => setMapMode('on')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-medium transition-all ${mapMode === 'on' ? (darkMode ? 'bg-gray-700 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (darkMode ? 'text-gray-400' : 'text-gray-500')}`}><MapIcon className="w-3 h-3" /> Map</button>
-                <button onClick={() => setMapMode('off')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-medium transition-all ${mapMode === 'off' ? (darkMode ? 'bg-gray-700 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (darkMode ? 'text-gray-400' : 'text-gray-500')}`}><Grid className="w-3 h-3" /> Abstract</button>
+                <button onClick={() => setMapMode('satellite')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-medium transition-all ${mapMode === 'satellite' ? (darkMode ? 'bg-gray-700 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (darkMode ? 'text-gray-400' : 'text-gray-500')}`}><Globe className="w-3 h-3" /> Sat</button>
+                <button onClick={() => setMapMode('off')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-medium transition-all ${mapMode === 'off' ? (darkMode ? 'bg-gray-700 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (darkMode ? 'text-gray-400' : 'text-gray-500')}`}><Grid className="w-3 h-3" /> Abs</button>
           </div>
           
-          {/* New Granular Toggle Controls */}
+          {/* Link Toggles */}
           <div className="flex gap-2">
               <button 
                 onClick={() => setShowPotentialLinks(!showPotentialLinks)} 
@@ -202,8 +208,6 @@ const ControlPanel = ({
           </div>
         </section>
 
-        {/* ... Rest of the components (Data, Analysis, Simulation, Topology) remain the same ... */}
-        {/* Included abbreviated for context continuity */}
         <section>
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Data</h3>
             <div className="flex gap-2">
@@ -252,8 +256,8 @@ const ControlPanel = ({
             </div>
           </div>
 
+          {/* Random Configuration Panel */}
           <div className={`border rounded p-3 text-xs space-y-3 transition-all duration-300 overflow-hidden ${showRandomMenu ? 'max-h-96 opacity-100 mb-3' : 'max-h-0 opacity-0 mb-0'} ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
-                {/* Random Controls - Same as before */}
                 {['sinks', 'gens', 'relays'].map(key => (
                     <div key={key} className="flex items-center justify-between">
                         <span className={`font-semibold capitalize ${key === 'sinks' ? (darkMode ? 'text-red-400' : 'text-red-600') : key === 'relays' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-blue-400' : 'text-blue-600')}`}>{key}:</span>
@@ -285,6 +289,7 @@ const ControlPanel = ({
             <button onClick={() => addNode('RELAY')} className={`flex items-center justify-center gap-1 py-2 text-xs font-bold rounded border transition-colors ${darkMode ? 'bg-green-900/30 text-green-300 hover:bg-green-900/50 border-green-800' : 'bg-green-50 text-green-700 hover:bg-green-100 border-green-200'}`}><Plus className="w-3 h-3" /> Relay</button>
             <button onClick={() => addNode('BASE_STATION')} className={`flex items-center justify-center gap-1 py-2 text-xs font-bold rounded border transition-colors ${darkMode ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50 border-red-800' : 'bg-red-50 text-red-700 hover:bg-red-100 border-red-200'}`}><Plus className="w-3 h-3" /> Sink</button>
           </div>
+          
           <div className="space-y-2 max-h-[250px] overflow-y-auto">
             {nodes.map(node => (
               <div 
@@ -305,9 +310,9 @@ const ControlPanel = ({
         </section>
       </div>
 
+      {/* Footer */}
       <div className={`p-4 border-t flex flex-col justify-end gap-3 transition-all duration-300 ease-in-out ${viewMode === 'tdma' ? 'h-36' : 'h-24'} ${darkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
-         {/* ... (Footer remains same as previous update) */}
-         <div className={`space-y-1 transition-all duration-300 ${viewMode === 'tdma' ? 'opacity-100 mb-4' : 'opacity-0 h-0 overflow-hidden mb-0'}`}>
+        <div className={`space-y-1 transition-all duration-300 ${viewMode === 'tdma' ? 'opacity-100 mb-4' : 'opacity-0 h-0 overflow-hidden mb-0'}`}>
           <div className={`flex justify-between text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}><span>TDMA Schedule</span><span className="font-mono">{currentMs}ms / 10000ms</span></div>
           <div className="flex items-center gap-2">
              <button onClick={() => playback.setIsPlaying(!playback.isPlaying)} className={`p-1.5 rounded-full hover:shadow transition-all ${darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-white text-gray-700'}`}>{playback.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}</button>

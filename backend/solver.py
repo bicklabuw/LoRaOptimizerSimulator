@@ -1,7 +1,7 @@
 import pulp
 from typing import List, Dict, Tuple
 
-from models import SolverResult, LinkResult, GeneratorResult, NodeType
+from models import SolverResult, LinkResult, GeneratorResult, ScheduleDiagnostics, NodeType
 from topology import TopologyManager
 from scheduler import TDMAScheduler
 
@@ -229,6 +229,26 @@ class NetworkSolver:
         scheduler = TDMAScheduler(link_results, self.cliques, self.topo.config.num_channels)
         scheduled_links = scheduler.schedule()
 
+        # Build schedule diagnostics (defensive defaults in case you ever change scheduler)
+        frame_ticks = getattr(scheduler, "frame_ticks", 10000)
+        frame_stretch = getattr(scheduler, "frame_stretch", 1.0)
+        had_overflow = getattr(scheduler, "had_overflow", False)
+        overflow_indices = getattr(scheduler, "overflow_link_indices", [])
+
+        schedule_diagnostics = ScheduleDiagnostics(
+            frame_ticks=frame_ticks,
+            frame_stretch=frame_stretch,
+            had_overflow=had_overflow,
+            overflow_links=[
+                (
+                    scheduled_links[i].source_id,
+                    scheduled_links[i].target_id,
+                    scheduled_links[i].channel,
+                )
+                for i in overflow_indices
+            ],
+        )
+
         return SolverResult(
             status=status,
             fair_rate=fair_rate_floor,
@@ -236,6 +256,7 @@ class NetworkSolver:
             active_links=scheduled_links,
             generator_rates=gen_results,
             clique_count=len(self.cliques),
+            schedule_diagnostics=schedule_diagnostics,
         )
 
     # ------------------------------------------------------------------

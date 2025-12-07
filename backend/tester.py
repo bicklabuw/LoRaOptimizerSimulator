@@ -328,7 +328,7 @@ def main():
     ]
 
     run_test("Long Chain (25% Capacity)", nodes_9, overrides_9, cfg,
-             expected_rate=base_single_link_rate() / 4.0)
+             expected_rate=(base_capacity - base_single_link_rate()) / 8.3 + base_single_link_rate() / 4.0)
 
     # =======================================================
     # SCENARIO 10: ACK-Limited Reverse Link

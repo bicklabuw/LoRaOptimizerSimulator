@@ -87,17 +87,29 @@ class TDMAScheduler:
                 f"cliques={self.link_clique_map.get(idx, [])}"
             )
 
-        # Structured ordering: group by (source, channel), then longest & most conflicting first
+        # Ordering: hardest-to-place links first
+        # 1) Higher conflict degree (in more cliques)
+        # 2) Longer duration (harder to fit contiguously)
+        # 3) Stable by source/channel
         def sort_key(idx: int):
             link = self.links[idx]
             return (
+                -conflict_degree[idx],   # more constrained first
+                -durations[idx],          # longer first among them
                 link.source_id,
                 link.channel,
-                -durations[idx],
-                -conflict_degree[idx],
             )
 
         task_order = sorted(active_indices, key=sort_key)
+
+        print("[Scheduler] Task order (by index):")
+        for order_pos, idx in enumerate(task_order):
+            link = self.links[idx]
+            print(
+                f"  Pos {order_pos:2d}: [{idx}] {link.source_id}->{link.target_id} ch{link.channel}, "
+                f"airtime={link.airtime_fraction:.4f}, ticks={durations[idx]}, "
+                f"cliques={self.link_clique_map.get(idx, [])}"
+            )
 
         # Resource tables (only for the "core" frame [0, TICKS_PER_FRAME))
         node_busy: Dict[int, bytearray] = {nid: bytearray(TICKS_PER_FRAME) for nid in node_ids_sorted}
@@ -206,6 +218,11 @@ class TDMAScheduler:
         if overflow_indices:
             print(f"[Scheduler] ⚠ {len(overflow_indices)} link(s) extend beyond the nominal frame.")
             self._debug_visualize(overflow_indices, placements, node_busy)
+
+        self.frame_ticks = max_tick
+        self.frame_stretch = max_tick / TICKS_PER_FRAME
+        self.had_overflow = (max_tick > TICKS_PER_FRAME)
+        self.overflow_link_indices = overflow_indices
 
         # Renormalize all schedule fragments to [0, max_tick]
         for idx, (s_tick, e_tick) in placements.items():

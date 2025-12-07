@@ -112,7 +112,8 @@ const NetworkMap = ({
   linkOverrides, onOverrideLink,
   mapMode, currentTime, isPlaying, isStale, viewMode, 
   darkMode, hoveredNodeId, setHoveredNodeId,
-  showPotentialLinks, showOverrideLinks
+  showPotentialLinks, showOverrideLinks,
+  hoveredLinkKey, setHoveredLinkKey
 }) => {
   const [doRecenter, setDoRecenter] = React.useState(false);
   useEffect(() => { setDoRecenter(true); }, [nodes.length]); 
@@ -155,17 +156,7 @@ const NetworkMap = ({
         <style>{`
             .leaflet-container { background: transparent !important; }
             .leaflet-tile-pane { transition: opacity 0.5s ease-in-out; opacity: ${mapMode === 'on' ? 1 : 0}; }
-            .leaflet-popup-content-wrapper { border-radius: 8px; }
-            .leaflet-popup-close-button {
-                opacity: 1 !important; 
-                width: 24px !important; height: 24px !important;
-                display: flex; align-items: center; justify-content: center;
-                top: 4px !important; right: 4px !important;
-                color: #64748b !important;
-                font-size: 18px !important;
-                border-radius: 50%;
-                transition: background 0.2s;
-            }
+            .leaflet-popup-close-button { opacity: 1 !important; width: 24px !important; height: 24px !important; display: flex; align-items: center; justify-content: center; top: 4px !important; right: 4px !important; color: #64748b !important; font-size: 18px !important; border-radius: 50%; transition: background 0.2s; }
             .leaflet-popup-close-button:hover { background-color: rgba(0,0,0,0.05); color: #ef4444 !important; }
             .leaflet-interactive { cursor: pointer; }
         `}</style>
@@ -174,13 +165,11 @@ const NetworkMap = ({
             <RecenterControl nodes={nodes} doRecenter={doRecenter} setDoRecenter={setDoRecenter} />
             {darkMode ? <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" /> : <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />}
 
-            {/* Ghost Links Layer */}
+            {/* Ghost Links */}
             {ghostLinks.map((link) => {
                 const n1 = nodes.find(n => n.id === link.source_id);
                 const n2 = nodes.find(n => n.id === link.target_id);
                 if(!n1 || !n2) return null;
-                
-                // Hide ghost if active link exists
                 const isActive = groupedLinks[`${Math.min(n1.id,n2.id)}-${Math.max(n1.id,n2.id)}`];
                 if(isActive) return null;
 
@@ -188,7 +177,6 @@ const NetworkMap = ({
                 const override = linkOverrides.find(o => (o.source_id === n1.id && o.target_id === n2.id) || (o.source_id === n2.id && o.target_id === n1.id));
                 const isOverridden = !!override;
 
-                // FILTERING LOGIC
                 if (isOverridden && !showOverrideLinks) return null;
                 if (!isOverridden && !showPotentialLinks) return null;
 
@@ -197,7 +185,7 @@ const NetworkMap = ({
                         key={`ghost-${n1.id}-${n2.id}`} 
                         positions={[[n1.lat, n1.lon], [n2.lat, n2.lon]]} 
                         pathOptions={{ 
-                            color: isOverridden ? '#d946ef' : color, // Purple for overrides
+                            color: isOverridden ? '#d946ef' : color, 
                             weight: 5, 
                             dashArray: isOverridden ? '8, 8' : '6, 6', 
                             opacity: 0.6 
@@ -220,33 +208,17 @@ const NetworkMap = ({
                                 </div>
                                 <div className="flex justify-between gap-4"><span>Est. Capacity:</span><span className="font-mono" style={{color}}>{link.capacity} bps</span></div>
                                 <div className="flex justify-between gap-4"><span>Distance:</span><span className="font-mono">{Math.round(link.distance)}m</span></div>
-                                {isOverridden && (
-                                    <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-gray-100">
-                                        <span className="text-purple-500">Forced:</span>
-                                        <span className="font-mono font-bold text-purple-600">{override.capacity_bps} bps</span>
-                                    </div>
-                                )}
+                                {isOverridden && (<div className="flex justify-between gap-4 mt-1 pt-1 border-t border-gray-100"><span className="text-purple-500">Forced:</span><span className="font-mono font-bold text-purple-600">{override.capacity_bps} bps</span></div>)}
                             </div>
                         </Tooltip>
                         <Popup minWidth={220}>
                             <div className="p-1 pt-2 pr-4">
                                 <h4 className="font-bold text-sm mb-2 flex items-center gap-2"><Edit2 size={12}/> Configure Potential Link</h4>
                                 <div className="bg-gray-50 p-2 rounded border border-gray-100 mb-2">
-                                    <div className="text-xs text-gray-500 mb-1 flex justify-between">
-                                        <span>Capacity (Bidirectional)</span>
-                                        <span className="font-mono">{link.capacity} bps</span>
-                                    </div>
-                                    <input type="number" placeholder={`Auto (${link.capacity})`} className="w-full text-xs border rounded px-1 py-1"
-                                        defaultValue={override?.capacity_bps || ''}
-                                        onBlur={(e) => { 
-                                            onOverrideLink(n1.id, n2.id, e.target.value); 
-                                            onOverrideLink(n2.id, n1.id, e.target.value); 
-                                        }}
-                                    />
+                                    <div className="text-xs text-gray-500 mb-1 flex justify-between"><span>Capacity (Bidirectional)</span><span className="font-mono">{link.capacity} bps</span></div>
+                                    <input type="number" placeholder={`Auto (${link.capacity})`} className="w-full text-xs border rounded px-1 py-1" defaultValue={override?.capacity_bps || ''} onBlur={(e) => { onOverrideLink(n1.id, n2.id, e.target.value); onOverrideLink(n2.id, n1.id, e.target.value); }} />
                                 </div>
-                                <div className="text-[10px] text-gray-500 italic border-t pt-1 mt-1 leading-tight">
-                                    Set <b>0</b> to disable link.<br/>Clear input to return to <b>Auto</b>.
-                                </div>
+                                <div className="text-[10px] text-gray-500 italic border-t pt-1 mt-1 leading-tight">Set <b>0</b> to disable link.<br/>Clear input to return to <b>Auto</b>.</div>
                             </div>
                         </Popup>
                     </Polyline>
@@ -258,6 +230,9 @@ const NetworkMap = ({
                 const node1 = nodes.find(n => n.id === group.id1);
                 const node2 = nodes.find(n => n.id === group.id2);
                 if (!node1 || !node2) return null;
+
+                const linkKey = `${node1.id}-${node2.id}`;
+                const isHovered = linkKey === hoveredLinkKey;
 
                 let activeTx = null; 
                 const checkSched = (link, from, to) => {
@@ -291,12 +266,34 @@ const NetworkMap = ({
                     else { color = '#eab308'; weight = 6; opacity = 1.0; }
                 }
 
+                // Apply Highlight Style
+                if (isHovered) {
+                    color = '#06b6d4'; // Cyan for highlight
+                    weight = 8;
+                    opacity = 1.0;
+                }
+
                 const midLat = (node1.lat + node2.lat) / 2;
                 const midLon = (node1.lon + node2.lon) / 2;
 
                 return (
                     <React.Fragment key={`link-${group.id1}-${group.id2}`}>
-                        <Polyline positions={[[node1.lat, node1.lon], [node2.lat, node2.lon]]} pathOptions={{ color, weight, opacity, dashArray }} eventHandlers={{ mouseover: (e) => e.target.openTooltip() }}>
+                        {/* Highlight Underlay */}
+                        {isHovered && <Polyline positions={[[node1.lat, node1.lon], [node2.lat, node2.lon]]} pathOptions={{ color: '#22d3ee', weight: 12, opacity: 0.3 }} interactive={false} />}
+                        
+                        <Polyline 
+                            positions={[[node1.lat, node1.lon], [node2.lat, node2.lon]]} 
+                            pathOptions={{ color, weight, opacity, dashArray }} 
+                            eventHandlers={{ 
+                                mouseover: (e) => { 
+                                    e.target.openTooltip(); 
+                                    setHoveredLinkKey(linkKey); // Trigger
+                                }, 
+                                mouseout: (e) => { 
+                                    setHoveredLinkKey(null); // Clear
+                                }
+                            }}
+                        >
                             <Tooltip sticky>
                                 <div className="text-xs font-sans min-w-[200px]">
                                     <div className="font-bold border-b pb-1 mb-1">Link {group.id1} ↔ {group.id2}</div>
@@ -313,22 +310,14 @@ const NetworkMap = ({
                                     <div className="space-y-3">
                                         <div className="bg-gray-50 p-2 rounded border border-gray-100">
                                             <div className="text-xs font-bold text-gray-700 mb-1 flex justify-between"><span>{node1.name} → {node2.name}</span> <span className="text-gray-400 font-normal">Cur: {group.forward?.capacity_bps}</span></div>
-                                            <input type="number" placeholder={`Override (Cur: ${group.forward?.capacity_bps})`} className="w-full text-xs border rounded px-1 py-1"
-                                                defaultValue={linkOverrides.find(l => l.source_id === node1.id && l.target_id === node2.id)?.capacity_bps || ''}
-                                                onBlur={(e) => onOverrideLink(node1.id, node2.id, e.target.value)}
-                                            />
+                                            <input type="number" placeholder={`Override (Cur: ${group.forward?.capacity_bps})`} className="w-full text-xs border rounded px-1 py-1" defaultValue={linkOverrides.find(l => l.source_id === node1.id && l.target_id === node2.id)?.capacity_bps || ''} onBlur={(e) => onOverrideLink(node1.id, node2.id, e.target.value)} />
                                         </div>
                                         <div className="bg-gray-50 p-2 rounded border border-gray-100">
                                             <div className="text-xs font-bold text-gray-700 mb-1 flex justify-between"><span>{node2.name} → {node1.name}</span> <span className="text-gray-400 font-normal">Cur: {group.reverse?.capacity_bps}</span></div>
-                                            <input type="number" placeholder={`Override (Cur: ${group.reverse?.capacity_bps})`} className="w-full text-xs border rounded px-1 py-1"
-                                                defaultValue={linkOverrides.find(l => l.source_id === node2.id && l.target_id === node1.id)?.capacity_bps || ''}
-                                                onBlur={(e) => onOverrideLink(node2.id, node1.id, e.target.value)}
-                                            />
+                                            <input type="number" placeholder={`Override (Cur: ${group.reverse?.capacity_bps})`} className="w-full text-xs border rounded px-1 py-1" defaultValue={linkOverrides.find(l => l.source_id === node2.id && l.target_id === node1.id)?.capacity_bps || ''} onBlur={(e) => onOverrideLink(node2.id, node1.id, e.target.value)} />
                                         </div>
                                     </div>
-                                    <div className="text-[10px] text-gray-500 italic border-t pt-1 mt-2 leading-tight">
-                                        Set <b>0</b> to disable link.<br/>Clear input to return to <b>Auto</b>.
-                                    </div>
+                                    <div className="text-[10px] text-gray-500 italic border-t pt-1 mt-2 leading-tight">Set <b>0</b> to disable link.<br/>Clear input to return to <b>Auto</b>.</div>
                                 </div>
                             </Popup>
                         </Polyline>

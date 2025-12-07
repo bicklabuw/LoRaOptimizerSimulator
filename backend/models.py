@@ -55,6 +55,16 @@ class GeneratorResult(BaseModel):
     node_id: int
     rate_bps: float
 
+class ScheduleDiagnostics(BaseModel):
+    # Total frame length in scheduler ticks (10000 = nominal)
+    frame_ticks: int
+    # How much the frame was stretched vs nominal (1.0 = no stretch)
+    frame_stretch: float
+    # True if any link had to be scheduled past the nominal frame
+    had_overflow: bool
+    # Optional list of (src, dst, channel) triples for links that extend past the frame
+    overflow_links: List[tuple[int, int, int]] = []
+
 class SolverResult(BaseModel):
     status: str
     fair_rate: float
@@ -62,3 +72,4 @@ class SolverResult(BaseModel):
     active_links: List[LinkResult]
     generator_rates: List[GeneratorResult]
     clique_count: int
+    schedule: Optional[ScheduleDiagnostics] = None

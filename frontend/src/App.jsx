@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import NetworkMap from './components/NetworkMap';
 import ControlPanel from './components/ControlPanel';
+import ScheduleTimeline from './components/ScheduleTimeline';
 import { optimizeNetwork } from './api';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -18,27 +19,25 @@ const INITIAL_CONFIG = {
   use_map_data: true
 };
 
-// --- Pure Helper Functions ---
 const getDistanceMeters = (n1, n2) => {
-  const R = 6371e3; 
-  const φ1 = n1.lat * Math.PI/180;
-  const φ2 = n2.lat * Math.PI/180;
-  const Δφ = (n2.lat-n1.lat) * Math.PI/180;
-  const Δλ = (n2.lon-n1.lon) * Math.PI/180;
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-          Math.cos(φ1) * Math.cos(φ2) *
-          Math.sin(Δλ/2) * Math.sin(Δλ/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
+    const R = 6371e3; 
+    const φ1 = n1.lat * Math.PI/180;
+    const φ2 = n2.lat * Math.PI/180;
+    const Δφ = (n2.lat-n1.lat) * Math.PI/180;
+    const Δλ = (n2.lon-n1.lon) * Math.PI/180;
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
 };
 
 const getEstimatedCapacity = (dist) => {
-  if (dist > 2000) return 0;
-  if (dist > 1000) return 300; 
-  if (dist > 500) return 1700;
-  return 5400; 
+    if (dist > 2000) return 0;
+    if (dist > 1000) return 300; 
+    if (dist > 500) return 1700;
+    return 5400; 
 };
-// -----------------------------
 
 function App() {
   const [nodes, setNodes] = useState(INITIAL_NODES);
@@ -50,14 +49,16 @@ function App() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [mapMode, setMapMode] = useState('on'); 
   
-  // New Split State for Ghost Links
   const [showPotentialLinks, setShowPotentialLinks] = useState(true);
   const [showOverrideLinks, setShowOverrideLinks] = useState(true);
+  
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
 
   const [isStale, setIsStale] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false); 
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
+  const [hoveredLinkKey, setHoveredLinkKey] = useState(null); // New Shared State
   
   const [currentTime, setCurrentTime] = useState(0); 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -97,7 +98,6 @@ function App() {
   };
 
   const ghostLinks = useMemo(() => {
-    // We calculate ALL potential links here, filtering happens in NetworkMap based on display toggles
     const links = [];
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
@@ -113,7 +113,7 @@ function App() {
       }
     }
     return links;
-  }, [nodes]); // Depend only on nodes, not toggles
+  }, [nodes]);
 
   const handleRunOptimization = async () => {
     setIsOptimizing(true);
@@ -127,6 +127,7 @@ function App() {
         setIsStale(false);
         setCurrentTime(0);
         setIsPlaying(true);
+        setIsTimelineOpen(true);
       }
     } catch (err) {
       console.error(err);
@@ -146,7 +147,8 @@ function App() {
   return (
     <div className={`flex h-screen w-screen font-sans overflow-hidden relative transition-colors duration-500`}>
       <div 
-        className={`absolute left-0 top-0 h-full shadow-2xl z-[2000] transition-transform duration-300 ease-in-out ${
+        style={{ height: isTimelineOpen ? 'calc(100% - 300px)' : 'calc(100% - 40px)' }}
+        className={`absolute left-0 top-0 shadow-2xl z-[2000] transition-all duration-300 ease-in-out ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${darkMode ? 'bg-gray-900 border-r border-gray-700' : 'bg-white border-r border-gray-200'}`}
       >
@@ -162,12 +164,10 @@ function App() {
           result={result}
           mapMode={mapMode}
           setMapMode={setMapMode}
-          // Pass new separate toggles
           showPotentialLinks={showPotentialLinks}
           setShowPotentialLinks={setShowPotentialLinks}
           showOverrideLinks={showOverrideLinks}
           setShowOverrideLinks={setShowOverrideLinks}
-          
           playback={{ isPlaying, setIsPlaying, currentTime, setCurrentTime, playbackSpeed, setPlaybackSpeed }}
           viewMode={viewMode}
           setViewMode={setViewMode}
@@ -204,7 +204,7 @@ function App() {
                }} 
           />
 
-          <div className="absolute inset-0 z-10">
+          <div className="absolute inset-0 z-10" style={{ paddingBottom: isTimelineOpen ? '300px' : '40px', transition: 'padding-bottom 0.3s ease' }}>
             <NetworkMap 
                 nodes={nodes} 
                 onNodeMove={handleNodeMove}
@@ -221,7 +221,8 @@ function App() {
                 darkMode={darkMode}
                 hoveredNodeId={hoveredNodeId}
                 setHoveredNodeId={setHoveredNodeId}
-                // Pass toggles to map
+                hoveredLinkKey={hoveredLinkKey} // Pass
+                setHoveredLinkKey={setHoveredLinkKey} // Pass
                 showPotentialLinks={showPotentialLinks}
                 showOverrideLinks={showOverrideLinks}
             />
@@ -259,6 +260,20 @@ function App() {
               )}
           </div>
         </div>
+
+        <ScheduleTimeline 
+            nodes={nodes} 
+            result={result} 
+            currentTime={currentTime} 
+            onSeek={setCurrentTime}
+            isOpen={isTimelineOpen}
+            setIsOpen={setIsTimelineOpen}
+            darkMode={darkMode}
+            hoveredLinkKey={hoveredLinkKey}
+            setHoveredLinkKey={setHoveredLinkKey}
+            isPlaying={isPlaying} 
+            onTogglePlay={() => setIsPlaying(!isPlaying)}
+        />
       </div>
     </div>
   );
