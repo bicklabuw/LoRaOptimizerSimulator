@@ -26,6 +26,10 @@ class SimulationConfig(BaseModel):
     frequency_hz: float = 915_000_000
     tx_power_dbm: float = 22.0
     enable_pass_2_sparsification: bool = True 
+    
+    # CHANGED: Dynamic overhead instead of fixed fraction
+    # 0.10 means 10% of RX time is required for TX (ACKs/Beacons)
+    ack_overhead_ratio: float = 0.10 
 
 class SimulationRequest(BaseModel):
     nodes: List[Node]
@@ -44,9 +48,7 @@ class LinkResult(BaseModel):
     airtime_fraction: float
     capacity_bps: float
     flow_bps: float
-    # List of time slots (fragments)
     schedule: List[ScheduleFragment] = [] 
-    # start_offset is deprecated in favor of schedule list, but kept for compat if needed
     start_offset: float = 0.0
 
 class GeneratorResult(BaseModel):

@@ -1,3 +1,4 @@
 backend/__pycache__
 backend/*.lp
+backend/failed*.json
 frontend/node_modules
