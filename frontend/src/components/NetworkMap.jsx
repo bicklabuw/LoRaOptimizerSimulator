@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Crosshair, Edit2 } from 'lucide-react';
+import { Crosshair, Edit2, AlertTriangle } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import iconMarker from 'leaflet/dist/images/marker-icon.png';
 import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
@@ -113,7 +113,9 @@ const NetworkMap = ({
   mapMode, currentTime, isPlaying, isStale, viewMode, 
   darkMode, hoveredNodeId, setHoveredNodeId,
   showPotentialLinks, showOverrideLinks,
-  hoveredLinkKey, setHoveredLinkKey
+  hoveredLinkKey, setHoveredLinkKey,
+  // New prop to receive overflow data
+  overflowLinks = [] 
 }) => {
   const [doRecenter, setDoRecenter] = React.useState(false);
   useEffect(() => { setDoRecenter(true); }, [nodes.length]); 
@@ -153,9 +155,10 @@ const NetworkMap = ({
 
   return (
     <div className="relative h-full w-full">
+        {/* FIX 1: Allow opacity to be 1 for both 'on' AND 'satellite' */}
         <style>{`
             .leaflet-container { background: transparent !important; }
-            .leaflet-tile-pane { transition: opacity 0.5s ease-in-out; opacity: ${mapMode === 'on' ? 1 : 0}; }
+            .leaflet-tile-pane { transition: opacity 0.5s ease-in-out; opacity: ${mapMode !== 'off' ? 1 : 0}; }
             .leaflet-popup-close-button { opacity: 1 !important; width: 24px !important; height: 24px !important; display: flex; align-items: center; justify-content: center; top: 4px !important; right: 4px !important; color: #64748b !important; font-size: 18px !important; border-radius: 50%; transition: background 0.2s; }
             .leaflet-popup-close-button:hover { background-color: rgba(0,0,0,0.05); color: #ef4444 !important; }
             .leaflet-interactive { cursor: pointer; }
@@ -163,7 +166,20 @@ const NetworkMap = ({
 
         <MapContainer center={center} zoom={16} style={{ height: '100%', width: '100%', background: 'transparent' }} zoomControl={false} attributionControl={false} preferCanvas={true}>
             <RecenterControl nodes={nodes} doRecenter={doRecenter} setDoRecenter={setDoRecenter} />
-            {darkMode ? <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" /> : <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />}
+            
+            {/* FIX 2: Correct TileLayers for Satellite Mode */}
+            {mapMode === 'satellite' ? (
+                <TileLayer
+                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                    attribution="Tiles &copy; Esri"
+                />
+            ) : (
+                darkMode ? (
+                    <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                ) : (
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                )
+            )}
 
             {/* Ghost Links */}
             {ghostLinks.map((link) => {
@@ -190,15 +206,6 @@ const NetworkMap = ({
                             dashArray: isOverridden ? '8, 8' : '6, 6', 
                             opacity: 0.6 
                         }}
-                        eventHandlers={{
-                            mouseover: (e) => {
-                                e.target.setStyle({ weight: 8, opacity: 0.9 });
-                                e.target.openTooltip();
-                            },
-                            mouseout: (e) => {
-                                e.target.setStyle({ weight: 5, opacity: 0.6 });
-                            }
-                        }}
                     >
                          <Tooltip sticky>
                             <div className="text-xs font-sans min-w-[150px]">
@@ -208,7 +215,6 @@ const NetworkMap = ({
                                 </div>
                                 <div className="flex justify-between gap-4"><span>Est. Capacity:</span><span className="font-mono" style={{color}}>{link.capacity} bps</span></div>
                                 <div className="flex justify-between gap-4"><span>Distance:</span><span className="font-mono">{Math.round(link.distance)}m</span></div>
-                                {isOverridden && (<div className="flex justify-between gap-4 mt-1 pt-1 border-t border-gray-100"><span className="text-purple-500">Forced:</span><span className="font-mono font-bold text-purple-600">{override.capacity_bps} bps</span></div>)}
                             </div>
                         </Tooltip>
                         <Popup minWidth={220}>
@@ -218,7 +224,6 @@ const NetworkMap = ({
                                     <div className="text-xs text-gray-500 mb-1 flex justify-between"><span>Capacity (Bidirectional)</span><span className="font-mono">{link.capacity} bps</span></div>
                                     <input type="number" placeholder={`Auto (${link.capacity})`} className="w-full text-xs border rounded px-1 py-1" defaultValue={override?.capacity_bps || ''} onBlur={(e) => { onOverrideLink(n1.id, n2.id, e.target.value); onOverrideLink(n2.id, n1.id, e.target.value); }} />
                                 </div>
-                                <div className="text-[10px] text-gray-500 italic border-t pt-1 mt-1 leading-tight">Set <b>0</b> to disable link.<br/>Clear input to return to <b>Auto</b>.</div>
                             </div>
                         </Popup>
                     </Polyline>
@@ -233,6 +238,11 @@ const NetworkMap = ({
 
                 const linkKey = `${node1.id}-${node2.id}`;
                 const isHovered = linkKey === hoveredLinkKey;
+
+                // FIX 3: Check for Overflow
+                const isOverflowing = overflowLinks.some(
+                    ([s, t]) => (s === group.id1 && t === group.id2) || (s === group.id2 && t === group.id1)
+                );
 
                 let activeTx = null; 
                 const checkSched = (link, from, to) => {
@@ -257,6 +267,14 @@ const NetworkMap = ({
                 const isOverridden = linkOverrides.some(o => (o.source_id === group.id1 && o.target_id === group.id2) || (o.source_id === group.id2 && o.target_id === group.id1));
                 if (isOverridden) dashArray = '4, 4';
 
+                // Overflow Style Priority
+                if (isOverflowing) {
+                    color = '#ef4444'; // Red
+                    weight = 5;
+                    opacity = 0.8;
+                    dashArray = '2, 4'; // Tight dotted warning line
+                }
+
                 if (viewMode === 'capacity') {
                     const maxCap = Math.max(group.forward?.capacity_bps || 0, group.reverse?.capacity_bps || 0);
                     color = getCapacityColor(maxCap);
@@ -266,9 +284,8 @@ const NetworkMap = ({
                     else { color = '#eab308'; weight = 6; opacity = 1.0; }
                 }
 
-                // Apply Highlight Style
                 if (isHovered) {
-                    color = '#06b6d4'; // Cyan for highlight
+                    color = '#06b6d4'; 
                     weight = 8;
                     opacity = 1.0;
                 }
@@ -278,7 +295,6 @@ const NetworkMap = ({
 
                 return (
                     <React.Fragment key={`link-${group.id1}-${group.id2}`}>
-                        {/* Highlight Underlay */}
                         {isHovered && <Polyline positions={[[node1.lat, node1.lon], [node2.lat, node2.lon]]} pathOptions={{ color: '#22d3ee', weight: 12, opacity: 0.3 }} interactive={false} />}
                         
                         <Polyline 
@@ -287,26 +303,31 @@ const NetworkMap = ({
                             eventHandlers={{ 
                                 mouseover: (e) => { 
                                     e.target.openTooltip(); 
-                                    setHoveredLinkKey(linkKey); // Trigger
+                                    setHoveredLinkKey(linkKey); 
                                 }, 
                                 mouseout: (e) => { 
-                                    setHoveredLinkKey(null); // Clear
+                                    setHoveredLinkKey(null); 
                                 }
                             }}
                         >
                             <Tooltip sticky>
                                 <div className="text-xs font-sans min-w-[200px]">
-                                    <div className="font-bold border-b pb-1 mb-1">Link {group.id1} ↔ {group.id2}</div>
+                                    <div className="font-bold border-b pb-1 mb-1 flex justify-between">
+                                        <span>Link {group.id1} ↔ {group.id2}</span>
+                                        {isOverflowing && <span className="text-red-500 flex items-center gap-1 bg-red-50 px-1 rounded border border-red-100"><AlertTriangle size={10}/> OVERFLOW</span>}
+                                    </div>
                                     <div className="grid grid-cols-[30px_1fr] gap-x-2 gap-y-1">
                                         <span className="text-gray-500 font-bold">Dir</span><span className="text-gray-500 font-mono text-right">Cap / Airtime</span>
                                         <span className="text-blue-600">Fwd</span><span className="font-mono text-right">{group.forward?.capacity_bps || 0}bps / {((group.forward?.airtime_fraction||0)*100).toFixed(1)}%</span>
                                         <span className="text-blue-600">Rev</span><span className="font-mono text-right">{group.reverse?.capacity_bps || 0}bps / {((group.reverse?.airtime_fraction||0)*100).toFixed(1)}%</span>
                                     </div>
+                                    {isOverflowing && <div className="mt-2 text-red-500 text-[10px] italic">This link is oversubscribed.</div>}
                                 </div>
                             </Tooltip>
                             <Popup minWidth={220}>
                                 <div className="p-1 pt-2 pr-4">
                                     <h4 className="font-bold text-sm mb-2 flex items-center gap-2"><Edit2 size={12}/> Link Configuration</h4>
+                                    {isOverflowing && <div className="mb-2 bg-red-100 text-red-700 p-2 rounded text-xs border border-red-200">Warning: Traffic exceeds capacity.</div>}
                                     <div className="space-y-3">
                                         <div className="bg-gray-50 p-2 rounded border border-gray-100">
                                             <div className="text-xs font-bold text-gray-700 mb-1 flex justify-between"><span>{node1.name} → {node2.name}</span> <span className="text-gray-400 font-normal">Cur: {group.forward?.capacity_bps}</span></div>
@@ -317,7 +338,6 @@ const NetworkMap = ({
                                             <input type="number" placeholder={`Override (Cur: ${group.reverse?.capacity_bps})`} className="w-full text-xs border rounded px-1 py-1" defaultValue={linkOverrides.find(l => l.source_id === node2.id && l.target_id === node1.id)?.capacity_bps || ''} onBlur={(e) => onOverrideLink(node2.id, node1.id, e.target.value)} />
                                         </div>
                                     </div>
-                                    <div className="text-[10px] text-gray-500 italic border-t pt-1 mt-2 leading-tight">Set <b>0</b> to disable link.<br/>Clear input to return to <b>Auto</b>.</div>
                                 </div>
                             </Popup>
                         </Polyline>

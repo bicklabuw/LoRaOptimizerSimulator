@@ -3,7 +3,7 @@ import NetworkMap from './components/NetworkMap';
 import ControlPanel from './components/ControlPanel';
 import ScheduleTimeline from './components/ScheduleTimeline';
 import { optimizeNetwork } from './api';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 const INITIAL_NODES = [
   { id: 1, name: 'Gen A', type: 'GENERATOR', lat: 43.0745, lon: -89.4012 },
@@ -58,12 +58,16 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false); 
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
-  const [hoveredLinkKey, setHoveredLinkKey] = useState(null); // New Shared State
+  const [hoveredLinkKey, setHoveredLinkKey] = useState(null);
   
   const [currentTime, setCurrentTime] = useState(0); 
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0); 
   const [viewMode, setViewMode] = useState('tdma'); 
+
+  // --- Dynamic Frame Duration Logic ---
+  const frameDurationMs = result?.schedule_diagnostics?.frame_ticks || 10000;
+  const hasOverflow = result?.schedule_diagnostics?.had_overflow || false;
 
   useEffect(() => {
     if (darkMode) {
@@ -73,12 +77,21 @@ function App() {
     }
   }, [darkMode]);
 
+  // Updated Animation Loop
   useEffect(() => {
     let animationFrame;
+    let lastTime = performance.now();
+
     if (isPlaying) {
-      const loop = () => {
+      const loop = (now) => {
+        const deltaMs = now - lastTime;
+        lastTime = now;
+        
+        // Calculate step size: (Time Passed * Speed) / Total Duration
+        const step = (deltaMs * playbackSpeed) / frameDurationMs;
+
         setCurrentTime(prev => {
-          const next = prev + (0.0015 * playbackSpeed);
+          const next = prev + step;
           return next > 1.0 ? 0 : next; 
         });
         animationFrame = requestAnimationFrame(loop);
@@ -86,7 +99,7 @@ function App() {
       animationFrame = requestAnimationFrame(loop);
     }
     return () => cancelAnimationFrame(animationFrame);
-  }, [isPlaying, playbackSpeed]);
+  }, [isPlaying, playbackSpeed, frameDurationMs]);
 
   const handleLinkOverride = (sourceId, targetId, cap) => {
     setLinkOverrides(prev => {
@@ -177,6 +190,7 @@ function App() {
           setDarkMode={setDarkMode}
           hoveredNodeId={hoveredNodeId}
           setHoveredNodeId={setHoveredNodeId}
+          frameDurationMs={frameDurationMs} // Passed down
         />
         
         <button
@@ -221,13 +235,15 @@ function App() {
                 darkMode={darkMode}
                 hoveredNodeId={hoveredNodeId}
                 setHoveredNodeId={setHoveredNodeId}
-                hoveredLinkKey={hoveredLinkKey} // Pass
-                setHoveredLinkKey={setHoveredLinkKey} // Pass
+                hoveredLinkKey={hoveredLinkKey}
+                setHoveredLinkKey={setHoveredLinkKey}
                 showPotentialLinks={showPotentialLinks}
                 showOverrideLinks={showOverrideLinks}
+                overflowLinks={result?.schedule_diagnostics?.overflow_links || []}
             />
           </div>
 
+          {/* Network Status Card */}
           <div className={`absolute top-4 right-4 p-4 rounded-lg shadow-xl z-20 backdrop-blur border min-w-[220px] pointer-events-none transition-colors duration-300 ${
               darkMode 
               ? 'bg-gray-900/95 border-gray-700 text-gray-100' 
@@ -237,6 +253,15 @@ function App() {
                 Network Status
                 {isStale && <span className="text-yellow-600 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200 px-1.5 py-0.5 rounded text-[10px] font-bold">CHANGED</span>}
               </h3>
+              
+              {/* Overflow Warning */}
+              {hasOverflow && (
+                  <div className="mb-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 text-xs px-2 py-1.5 rounded flex items-center gap-2 border border-red-200 dark:border-red-900">
+                      <AlertTriangle size={14} />
+                      <span className="font-bold">SCHEDULE OVERFLOW</span>
+                  </div>
+              )}
+
               {result ? (
                 <div className={`space-y-1 ${isStale ? 'opacity-50 grayscale' : ''}`}>
                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 flex items-baseline gap-1">
@@ -262,7 +287,7 @@ function App() {
         </div>
 
         <ScheduleTimeline 
-            nodes={nodes} 
+            nodes={nodes}
             result={result} 
             currentTime={currentTime} 
             onSeek={setCurrentTime}
@@ -271,7 +296,7 @@ function App() {
             darkMode={darkMode}
             hoveredLinkKey={hoveredLinkKey}
             setHoveredLinkKey={setHoveredLinkKey}
-            isPlaying={isPlaying} 
+            isPlaying={isPlaying}
             onTogglePlay={() => setIsPlaying(!isPlaying)}
         />
       </div>

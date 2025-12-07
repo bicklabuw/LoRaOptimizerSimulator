@@ -18,7 +18,8 @@ const ControlPanel = ({
   viewMode, setViewMode,
   isStale, setIsStale,
   darkMode, setDarkMode,
-  hoveredNodeId, setHoveredNodeId
+  hoveredNodeId, setHoveredNodeId,
+  frameDurationMs = 10000 // Default to 10s if not active
 }) => {
   const timelineRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -147,11 +148,13 @@ const ControlPanel = ({
     const x = e.clientX - rect.left;
     playback.setCurrentTime(Math.max(0, Math.min(1, x / rect.width)));
   };
-  const frameTotal = 10000; const currentMs = Math.round(playback.currentTime * frameTotal);
 
   const adjustRand = (key, delta) => {
       setRandConfig(prev => ({...prev, [key]: Math.max(0, prev[key] + delta)}));
   };
+
+  // Calculate current timestamp based on dynamic duration
+  const currentMs = Math.round(playback.currentTime * frameDurationMs);
 
   return (
     <div className={`w-80 h-full flex flex-col border-r transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-gray-100 border-gray-800' : 'bg-white text-gray-900 border-gray-200'}`}>
@@ -313,7 +316,8 @@ const ControlPanel = ({
       {/* Footer */}
       <div className={`p-4 border-t flex flex-col justify-end gap-3 transition-all duration-300 ease-in-out ${viewMode === 'tdma' ? 'h-36' : 'h-24'} ${darkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
         <div className={`space-y-1 transition-all duration-300 ${viewMode === 'tdma' ? 'opacity-100 mb-4' : 'opacity-0 h-0 overflow-hidden mb-0'}`}>
-          <div className={`flex justify-between text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}><span>TDMA Schedule</span><span className="font-mono">{currentMs}ms / 10000ms</span></div>
+          {/* Dynamic Time Display */}
+          <div className={`flex justify-between text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}><span>TDMA Schedule</span><span className="font-mono">{currentMs}ms / {frameDurationMs}ms</span></div>
           <div className="flex items-center gap-2">
              <button onClick={() => playback.setIsPlaying(!playback.isPlaying)} className={`p-1.5 rounded-full hover:shadow transition-all ${darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-white text-gray-700'}`}>{playback.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}</button>
              <div ref={timelineRef} onClick={handleTimelineClick} className={`flex-1 h-3 rounded-full overflow-hidden relative cursor-pointer transition-colors ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}>

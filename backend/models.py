@@ -72,4 +72,4 @@ class SolverResult(BaseModel):
     active_links: List[LinkResult]
     generator_rates: List[GeneratorResult]
     clique_count: int
-    schedule: Optional[ScheduleDiagnostics] = None
+    schedule_diagnostics: Optional[ScheduleDiagnostics] = None
