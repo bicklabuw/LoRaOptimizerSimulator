@@ -22,6 +22,7 @@ export const optimizeNetwork = async (nodes, config, linkOverrides = []) => {
     }
   };
 
+  console.log('API Payload:', payload);
   const response = await axios.post(`${API_URL}/optimize`, payload);
   console.log('API Response:', response.data);
   return response.data;

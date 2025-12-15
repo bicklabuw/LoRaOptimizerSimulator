@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from enum import Enum
 
@@ -20,6 +20,8 @@ class LinkOverride(BaseModel):
     source_id: int
     target_id: int
     capacity_bps: float
+    # Default to -1 to signify it wasn't inputted
+    spreading_factor: int = -1  
 
 class SimulationConfig(BaseModel):
     num_channels: int = 1
@@ -30,6 +32,19 @@ class SimulationConfig(BaseModel):
     # CHANGED: Dynamic overhead instead of fixed fraction
     # 0.10 means 10% of RX time is required for TX (ACKs/Beacons)
     ack_overhead_ratio: float = 0.10 
+    
+    # --- New Configs for Schedule Generation ---
+    # 0=10s, 1=20s, 2=40s, 3=80s
+    frame_s_index: int = 0  
+    # 0=None, 1=Hop-by-Hop
+    retrans_mode: int = 1   
+    num_frames_max: int = 15
+    min_ack_epochs_before_retry: int = 1
+    arq_max_retries: int = 2
+    arq_window: int = 128
+    data_max_outstanding_gen: int = 128
+    data_max_outstanding_relay: int = 64
+    data_max_age_frames: int = 4
 
 class SimulationRequest(BaseModel):
     nodes: List[Node]
@@ -73,3 +88,44 @@ class SolverResult(BaseModel):
     generator_rates: List[GeneratorResult]
     clique_count: int
     schedule_diagnostics: Optional[ScheduleDiagnostics] = None
+
+# --- New Output Models for /generate_schedule ---
+
+class GlobalScheduleConfig(BaseModel):
+    frame_s_index: int
+    num_frames_max: int
+    test_payload_bytes: int = 32
+
+    retrans_mode: int
+    min_ack_epochs_before_retry: int
+    arq_max_retries: int
+    arq_window: int
+
+    data_max_outstanding_gen: int
+    data_max_outstanding_relay: int
+    data_max_age_frames: int
+
+class ScheduleSlot(BaseModel):
+    other_id: int
+    is_tx: int         # 1=TX, 0=RX
+    is_ack: int        # 1=ACK, 0=Data
+    sf: int
+    ch: int
+    start_tick: int
+    dur_ticks: int
+
+class NodeSchedule(BaseModel):
+    node_id: int
+    parent_id: int
+    children: List[int]
+    slots: List[ScheduleSlot]
+
+class EmbeddedScheduleResponse(BaseModel):
+    schedule_id: int
+    # This ensures the JSON key is "global" while the Python attribute is "global_conf"
+    global_conf: GlobalScheduleConfig = Field(..., alias="global")
+    nodes: List[NodeSchedule]
+
+    class Config:
+        # Allows creating the object using global_conf name
+        populate_by_name = True
